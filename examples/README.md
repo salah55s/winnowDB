@@ -32,7 +32,7 @@ python3 -m http.server 8000
 ## Minimal Code
 
 ```javascript
-import init, { WinnowCollection } from '@winnow-db/winnow-db';
+import init, { WinnowCollection } from 'winnow-db';
 
 await init();
 

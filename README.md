@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@winnow-db/winnow-db"><img src="https://img.shields.io/npm/v/@winnow-db/winnow-db?color=blue" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/winnow-db"><img src="https://img.shields.io/npm/v/winnow-db?color=blue" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
   <img src="https://img.shields.io/badge/rust-1.70+-orange" alt="Rust">
   <img src="https://img.shields.io/badge/wasm-ready-purple" alt="WASM">
@@ -21,11 +21,11 @@
 ## ⚡ 30-Second Start
 
 ```bash
-npm install @winnow-db/winnow-db
+npm install winnow-db
 ```
 
 ```javascript
-import init, { WinnowCollection } from '@winnow-db/winnow-db';
+import init, { WinnowCollection } from 'winnow-db';
 
 await init();
 
@@ -135,7 +135,7 @@ See [examples/README.md](./examples/README.md) for more.
 
 ```html
 <script type="module">
-import init, { WinnowCollection } from '@winnow-db/winnow-db';
+import init, { WinnowCollection } from 'winnow-db';
 await init();
 // Same API as Node.js!
 </script>
