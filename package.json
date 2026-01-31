@@ -1,0 +1,34 @@
+{
+    "name": "winnow-db",
+    "version": "0.1.0-beta.1",
+    "description": "High-performance Vector Database for WASM environments with HNSW, IVFPQ, and Multi-threading support.",
+    "main": "pkg/winnow_db.js",
+    "module": "pkg/winnow_db.js",
+    "types": "pkg/winnow_db.d.ts",
+    "sideEffects": false,
+    "files": [
+        "pkg/winnow_db_bg.wasm",
+        "pkg/winnow_db.js",
+        "pkg/winnow_db.d.ts"
+    ],
+    "scripts": {
+        "build": "wasm-pack build --target web",
+        "build:nodejs": "wasm-pack build --target nodejs",
+        "test": "wasm-pack test --headless --chrome",
+        "prepare": "npm run build"
+    },
+    "keywords": [
+        "vector-database",
+        "wasm",
+        "rust",
+        "hnsw",
+        "ivfpq",
+        "search",
+        "embeddings"
+    ],
+    "author": "Winnow Team",
+    "license": "MIT",
+    "devDependencies": {
+        "wasm-pack": "^0.11.0"
+    }
+}

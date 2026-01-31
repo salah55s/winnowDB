@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinnowDB - Hybrid Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #38bdf8;
+            margin-bottom: 1rem;
+        }
+
+        .search-box {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            background: #0f172a;
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+
+        .slider-container {
+            margin: 1rem 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+
+        .results {
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .result-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .doc-title {
+            color: #38bdf8;
+        }
+
+        .score {
+            color: #4ade80;
+        }
+
+        .keywords {
+            color: #fbbf24;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔍 Hybrid Search Demo</h1>
+        <p>Combines semantic (dense) and keyword (sparse) search using RRF fusion.</p>
+
+        <div class="search-box">
+            <input type="text" id="query" placeholder="Enter search query..." value="machine learning tutorial">
+
+            <div class="slider-container">
+                <label>Dense Weight: <span id="weight-label">0.7</span></label>
+                <input type="range" id="weight" min="0" max="1" step="0.1" value="0.7">
+            </div>
+
+            <button id="btn-search">Search</button>
+        </div>
+
+        <div class="results" id="results">
+            <em>Add documents and search to see results...</em>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { WinnowCollection } from '../../pkg/winnow_db.js';
+
+        let db;
+
+        // Sample documents
+        const documents = [
+            { id: 1, title: "Introduction to Machine Learning", keywords: ["machine", "learning", "beginner", "tutorial"] },
+            { id: 2, title: "Deep Learning with PyTorch", keywords: ["deep", "learning", "pytorch", "neural"] },
+            { id: 3, title: "Natural Language Processing", keywords: ["nlp", "text", "language", "processing"] },
+            { id: 4, title: "Machine Learning for Beginners", keywords: ["machine", "learning", "beginner", "guide"] },
+            { id: 5, title: "Advanced Neural Networks", keywords: ["neural", "networks", "advanced", "deep"] },
+            { id: 6, title: "Python Programming Basics", keywords: ["python", "programming", "basics", "tutorial"] },
+            { id: 7, title: "Data Science Handbook", keywords: ["data", "science", "handbook", "analysis"] },
+            { id: 8, title: "Computer Vision Tutorial", keywords: ["computer", "vision", "image", "tutorial"] },
+        ];
+
+        // Simple keyword -> index mapping
+        const vocabulary = {};
+        let vocabSize = 0;
+        documents.forEach(doc => doc.keywords.forEach(kw => {
+            if (!(kw in vocabulary)) vocabulary[kw] = vocabSize++;
+        }));
+
+        async function initialize() {
+            await init();
+
+            db = new WinnowCollection("hybrid_demo", {
+                dim: 64,
+                index_type: 0,
+                m: 8,
+                ef_construction: 50
+            });
+
+            // Add documents
+            for (const doc of documents) {
+                // Dense: Random embedding (in real app, use transformer)
+                const dense = new Float32Array(64).map(() => Math.random() - 0.5);
+
+                // Sparse: Keyword indices and TF values
+                const sparseIndices = new Uint32Array(doc.keywords.map(kw => vocabulary[kw]));
+                const sparseValues = new Float32Array(doc.keywords.map(() => 1.0 / doc.keywords.length));
+
+                await db.add(doc.id, dense, sparseIndices, sparseValues, JSON.stringify(doc));
+            }
+
+            document.getElementById('results').innerHTML = `<em>Loaded ${documents.length} documents. Ready to search!</em>`;
+        }
+
+        document.getElementById('weight').addEventListener('input', (e) => {
+            document.getElementById('weight-label').textContent = e.target.value;
+        });
+
+        document.getElementById('btn-search').addEventListener('click', async () => {
+            const queryText = document.getElementById('query').value;
+            const denseWeight = parseFloat(document.getElementById('weight').value);
+
+            // Dense query (random for demo)
+            const denseQuery = new Float32Array(64).map(() => Math.random() - 0.5);
+
+            // Sparse query from keywords
+            const queryWords = queryText.toLowerCase().split(/\s+/);
+            const matchedIndices = queryWords.filter(w => w in vocabulary).map(w => vocabulary[w]);
+            const sparseIndices = new Uint32Array(matchedIndices);
+            const sparseValues = new Float32Array(matchedIndices.map(() => 1.0 / matchedIndices.length));
+
+            const results = await db.search_hybrid(
+                denseQuery,
+                sparseIndices,
+                sparseValues,
+                5, // top 5
+                denseWeight
+            );
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<strong>Results (RRF Fusion):</strong><br>';
+
+            results.forEach(([id, score], i) => {
+                const doc = documents.find(d => d.id === id);
+                resultsDiv.innerHTML += `
+          <div class="result-item">
+            <div>
+              <span class="doc-title">#${i + 1}: ${doc?.title || 'Unknown'}</span>
+              <div class="keywords">Keywords: ${doc?.keywords.join(', ')}</div>
+            </div>
+            <span class="score">${score.toFixed(4)}</span>
+          </div>
+        `;
+            });
+        });
+
+        initialize();
+    </script>
+</body>
+
+</html>

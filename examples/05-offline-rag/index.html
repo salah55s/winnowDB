@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline RAG with WinnowDB</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #1e1e2f 0%, #2d2d44 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #a5b4fc;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card h2 {
+            color: #a5b4fc;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .status.loading {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .status.ready {
+            border-left: 3px solid #22c55e;
+        }
+
+        .status.error {
+            border-left: 3px solid #ef4444;
+        }
+
+        .doc-list {
+            display: grid;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .doc-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .doc-item .id {
+            background: #4f46e5;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .messages {
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 12px;
+            max-width: 85%;
+        }
+
+        .message.user {
+            background: #4f46e5;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant {
+            background: rgba(255, 255, 255, 0.1);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message .sources {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-row input {
+            flex: 1;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #e2e8f0;
+            font-size: 1rem;
+        }
+
+        .input-row input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+
+        .input-row button {
+            padding: 1rem 1.5rem;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .input-row button:hover {
+            background: #4338ca;
+        }
+
+        .input-row button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #a5b4fc;
+        }
+
+        .metric-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧠 Offline RAG Demo</h1>
+        <p class="subtitle">100% browser-native retrieval augmented generation with WinnowDB + Transformers.js</p>
+
+        <div class="card">
+            <h2>📦 System Status</h2>
+            <div class="status loading" id="status">
+                <span id="statusIcon">⏳</span>
+                <span id="statusText">Initializing...</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📚 Knowledge Base</h2>
+            <div class="doc-list" id="docList">
+                <!-- Documents will be added here -->
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>💬 Ask Questions</h2>
+            <div class="chat-container">
+                <div class="messages" id="messages">
+                    <div class="message assistant">
+                        Welcome! Ask me anything about the documents in the knowledge base.
+                    </div>
+                </div>
+                <div class="input-row">
+                    <input type="text" id="questionInput" placeholder="Ask a question..." disabled />
+                    <button id="askBtn" disabled>Ask</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📊 Performance</h2>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-value" id="embedTime">-</div>
+                    <div class="metric-label">Embed Query</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="searchTime">-</div>
+                    <div class="metric-label">Vector Search</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="docCount">0</div>
+                    <div class="metric-label">Documents</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { WinnowCollection } from '../pkg/winnow_db.js';
+
+        // Sample knowledge base
+        const documents = [
+            { id: 1, content: "WinnowDB is a high-performance vector database that runs entirely in the browser using WebAssembly." },
+            { id: 2, content: "The HNSW (Hierarchical Navigable Small World) algorithm provides fast approximate nearest neighbor search with 95%+ recall." },
+            { id: 3, content: "WinnowDB supports hybrid search combining dense vectors with sparse BM25-style term matching." },
+            { id: 4, content: "Client-side encryption is supported using AES-256-GCM for secure vector storage in the browser." },
+            { id: 5, content: "WebGPU acceleration enables GPU-based distance calculations for faster search on supported browsers." },
+            { id: 6, content: "The vector database can persist to IndexedDB or OPFS for offline-first applications." },
+            { id: 7, content: "Product quantization (IVF-PQ) allows storing millions of vectors with reduced memory usage." },
+            { id: 8, content: "Metadata filtering enables combining semantic search with structured attribute queries." },
+        ];
+
+        let collection = null;
+        let embedder = null;
+
+        // UI Elements
+        const statusEl = document.getElementById('status');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusText = document.getElementById('statusText');
+        const docListEl = document.getElementById('docList');
+        const messagesEl = document.getElementById('messages');
+        const questionInput = document.getElementById('questionInput');
+        const askBtn = document.getElementById('askBtn');
+
+        function setStatus(state, text) {
+            statusEl.className = `status ${state}`;
+            statusIcon.textContent = state === 'loading' ? '⏳' : state === 'ready' ? '✅' : '❌';
+            statusText.textContent = text;
+        }
+
+        function addMessage(content, role, sources = null) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            div.innerHTML = content;
+            if (sources) {
+                div.innerHTML += `<div class="sources">📄 Sources: ${sources}</div>`;
+            }
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function renderDocuments() {
+            docListEl.innerHTML = documents.map(doc => `
+        <div class="doc-item">
+          <span class="id">#${doc.id}</span>
+          <span>${doc.content.slice(0, 80)}...</span>
+        </div>
+      `).join('');
+            document.getElementById('docCount').textContent = documents.length;
+        }
+
+        // Simple embedding using character n-grams (placeholder for Transformers.js)
+        // In production, use: const embedder = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+        function simpleEmbed(text) {
+            const dim = 128;
+            const vec = new Float32Array(dim);
+            const words = text.toLowerCase().split(/\s+/);
+
+            for (const word of words) {
+                for (let i = 0; i < word.length - 2; i++) {
+                    const trigram = word.slice(i, i + 3);
+                    const hash = trigram.charCodeAt(0) * 7 + trigram.charCodeAt(1) * 13 + trigram.charCodeAt(2) * 31;
+                    vec[hash % dim] += 1;
+                }
+            }
+
+            // Normalize
+            const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
+            for (let i = 0; i < dim; i++) vec[i] /= norm;
+
+            return vec;
+        }
+
+        async function initialize() {
+            try {
+                setStatus('loading', 'Loading WinnowDB WASM...');
+                await init();
+
+                setStatus('loading', 'Creating vector index...');
+                collection = new WinnowCollection("rag_demo", {
+                    dim: 128,
+                    index_type: "HNSW",
+                    m: 16,
+                    ef_construction: 100,
+                    max_elements: 1000
+                }, null);
+
+                setStatus('loading', 'Indexing documents...');
+                for (const doc of documents) {
+                    const embedding = simpleEmbed(doc.content);
+                    collection.add(doc.id, embedding, null, null, JSON.stringify(doc));
+                }
+
+                renderDocuments();
+
+                setStatus('ready', 'Ready! Ask questions about the knowledge base.');
+                questionInput.disabled = false;
+                askBtn.disabled = false;
+
+            } catch (e) {
+                setStatus('error', 'Error: ' + e.message);
+                console.error(e);
+            }
+        }
+
+        async function handleQuestion() {
+            const question = questionInput.value.trim();
+            if (!question) return;
+
+            questionInput.value = '';
+            addMessage(question, 'user');
+
+            // Embed query
+            const embedStart = performance.now();
+            const queryVec = simpleEmbed(question);
+            const embedTime = performance.now() - embedStart;
+            document.getElementById('embedTime').textContent = embedTime.toFixed(1) + 'ms';
+
+            // Search
+            const searchStart = performance.now();
+            const results = collection.search(queryVec, 3, null, null);
+            const searchTime = performance.now() - searchStart;
+            document.getElementById('searchTime').textContent = searchTime.toFixed(2) + 'ms';
+
+            // Format response
+            const context = results.map(([id, distance]) => {
+                const payload = JSON.parse(collection.get_payload(id));
+                return payload.content;
+            });
+
+            const sourceIds = results.map(([id, _]) => `#${id}`).join(', ');
+
+            // Simple response (in production, send to LLM)
+            const response = `Based on the knowledge base:\n\n${context.map((c, i) => `${i + 1}. ${c}`).join('\n\n')}`;
+
+            addMessage(response.replace(/\n/g, '<br>'), 'assistant', sourceIds);
+        }
+
+        askBtn.addEventListener('click', handleQuestion);
+        questionInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleQuestion();
+        });
+
+        initialize();
+    </script>
+</body>
+
+</html>

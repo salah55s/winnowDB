@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            width: 400px;
+            font-family: system-ui;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+        }
+
+        h2 {
+            color: #38bdf8;
+            font-size: 1rem;
+            margin: 0 0 1rem 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .results {
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .result {
+            padding: 0.5rem;
+            border-bottom: 1px solid #334155;
+            cursor: pointer;
+        }
+
+        .result:hover {
+            background: #334155;
+        }
+
+        .title {
+            color: #38bdf8;
+            font-size: 0.875rem;
+        }
+
+        .url {
+            color: #94a3b8;
+            font-size: 0.75rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>🔍 Semantic History Search</h2>
+    <input type="text" id="query" placeholder="Search your history...">
+    <div class="results" id="results"></div>
+
+    <script type="module">
+        // Note: In a real extension, you'd import WinnowDB here
+        // This is a simplified demo
+
+        const queryInput = document.getElementById('query');
+        const resultsDiv = document.getElementById('results');
+
+        // Mock results for demo
+        const mockHistory = [
+            { title: 'How to learn machine learning', url: 'https://example.com/ml' },
+            { title: 'Best Python tutorials 2024', url: 'https://example.com/python' },
+            { title: 'Deep learning for beginners', url: 'https://example.com/dl' },
+        ];
+
+        queryInput.addEventListener('input', async (e) => {
+            const query = e.target.value;
+            if (query.length < 2) return;
+
+            // In real app: search WinnowDB
+            // const results = await db.search(embedQuery(query), 10);
+
+            resultsDiv.innerHTML = mockHistory
+                .filter(h => h.title.toLowerCase().includes(query.toLowerCase()))
+                .map(h => `
+          <div class="result" onclick="window.open('${h.url}')">
+            <div class="title">${h.title}</div>
+            <div class="url">${h.url}</div>
+          </div>
+        `).join('');
+        });
+    </script>
+</body>
+
+</html>

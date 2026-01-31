@@ -1,0 +1,27 @@
+# Build artifacts
+/target
+/pkg/snippets
+
+# Dependencies
+/node_modules
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+check_error.log
+check_output.txt
+metric_task.md
+
+# Test artifacts
+test_wasm.mjs
+test_wasm.html
+serve.py

@@ -1,0 +1,10 @@
+pub mod metrics;
+pub mod audit;
+pub mod alerts;
+pub mod profiler;
+pub mod otel;
+pub use metrics::*;
+pub use audit::{AuditLogger, AuditLog, AuditEntry, AuditEventType};
+pub use alerts::{AlertManager, AlertEngine, AlertRule, AlertCondition, AlertSeverity};
+pub use profiler::{ProfileManager, Profiler, ProfileEntry, ProfileReport, QueryExplainer};
+pub use otel::{OTelManager, Span, SpanKind, SpanStatus};

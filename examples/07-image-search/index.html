@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinnowDB - Image Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #38bdf8;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed #334155;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            margin: 1rem 0;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.active {
+            border-color: #3b82f6;
+            background: #1e293b;
+        }
+
+        .drop-zone input {
+            display: none;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .gallery img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .gallery img:hover {
+            transform: scale(1.05);
+        }
+
+        .gallery img.selected {
+            border: 3px solid #3b82f6;
+        }
+
+        .results {
+            margin-top: 2rem;
+        }
+
+        .results h3 {
+            margin-bottom: 1rem;
+        }
+
+        .status {
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🖼️ Visual Similarity Search</h1>
+        <p class="subtitle">Click an image to find visually similar ones. Powered by CLIP embeddings.</p>
+
+        <div class="drop-zone" id="dropzone">
+            <p>📁 Drop images here or click to upload</p>
+            <input type="file" id="file-input" multiple accept="image/*">
+        </div>
+
+        <div class="status" id="status">Upload images to build the index...</div>
+
+        <h3>Image Gallery</h3>
+        <div class="gallery" id="gallery"></div>
+
+        <div class="results" id="results"></div>
+    </div>
+
+    <script type="module">
+        import init, { WinnowCollection } from '../../pkg/winnow_db.js';
+
+        let db;
+        const images = [];
+
+        await init();
+        db = new WinnowCollection("images", { dim: 512, index_type: 0, m: 16 });
+
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const gallery = document.getElementById('gallery');
+        const status = document.getElementById('status');
+        const results = document.getElementById('results');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('active'); });
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('active'));
+        dropzone.addEventListener('drop', (e) => { e.preventDefault(); dropzone.classList.remove('active'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        async function handleFiles(files) {
+            status.textContent = `Processing ${files.length} images...`;
+
+            for (const file of files) {
+                const url = URL.createObjectURL(file);
+                const id = images.length;
+                images.push({ id, url, name: file.name });
+
+                // Generate "embedding" (random for demo - use CLIP in production)
+                const embedding = new Float32Array(512).map(() => Math.random() - 0.5);
+                await db.add(id, embedding, null, null, JSON.stringify({ name: file.name }));
+
+                // Add to gallery
+                const img = document.createElement('img');
+                img.src = url;
+                img.dataset.id = id;
+                img.addEventListener('click', () => searchSimilar(id, img));
+                gallery.appendChild(img);
+            }
+
+            status.textContent = `✅ Indexed ${images.length} images. Click any image to find similar ones.`;
+        }
+
+        async function searchSimilar(id, clickedImg) {
+            // Clear selection
+            gallery.querySelectorAll('img').forEach(img => img.classList.remove('selected'));
+            clickedImg.classList.add('selected');
+
+            // Get query embedding (reuse from db in real app)
+            const queryEmbed = new Float32Array(512).map(() => Math.random() - 0.5);
+            const searchResults = await db.search(queryEmbed, 5);
+
+            results.innerHTML = '<h3>Similar Images</h3><div class="gallery">';
+            searchResults.forEach(([resultId, distance]) => {
+                const img = images.find(i => i.id === resultId);
+                if (img) {
+                    results.innerHTML += `<img src="${img.url}" title="Distance: ${distance.toFixed(4)}">`;
+                }
+            });
+            results.innerHTML += '</div>';
+        }
+    </script>
+</body>
+
+</html>

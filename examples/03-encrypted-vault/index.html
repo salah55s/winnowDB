@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinnowDB - Encrypted Vault</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #38bdf8;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            background: #0f172a;
+            color: #e2e8f0;
+            margin: 0.5rem 0;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 0.5rem;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+
+        button.danger {
+            background: #ef4444;
+        }
+
+        .status {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+        }
+
+        .status.success {
+            background: #166534;
+        }
+
+        .status.error {
+            background: #991b1b;
+        }
+
+        .locked {
+            filter: blur(4px);
+            pointer-events: none;
+        }
+
+        .lock-icon {
+            font-size: 3rem;
+            text-align: center;
+            margin: 2rem 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔐 Encrypted Vector Vault</h1>
+        <p class="subtitle">Client-side AES-256-GCM encryption. Your password never leaves the browser.</p>
+
+        <div class="card" id="auth-card">
+            <h3>Unlock Vault</h3>
+            <input type="password" id="password" placeholder="Enter master password">
+            <button id="btn-unlock">Unlock</button>
+            <button id="btn-create" class="danger">Create New Vault</button>
+        </div>
+
+        <div class="card locked" id="vault-card">
+            <div class="lock-icon">🔒</div>
+            <h3>Vault Contents</h3>
+            <input type="text" id="secret" placeholder="Enter secret to store...">
+            <button id="btn-add">Add to Vault</button>
+            <button id="btn-search">Search Vault</button>
+            <div id="vault-status"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { WinnowCollection } from '../../pkg/winnow_db.js';
+
+        let db = null;
+        let encryptionKey = null;
+
+        await init();
+
+        // Derive AES key from password
+        async function deriveKey(password, salt) {
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+            );
+            return crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        // Encrypt data
+        async function encrypt(data, key) {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const encrypted = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                new TextEncoder().encode(JSON.stringify(data))
+            );
+            return { iv: Array.from(iv), data: Array.from(new Uint8Array(encrypted)) };
+        }
+
+        // Decrypt data
+        async function decrypt(encrypted, key) {
+            const decrypted = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: new Uint8Array(encrypted.iv) },
+                key,
+                new Uint8Array(encrypted.data)
+            );
+            return JSON.parse(new TextDecoder().decode(decrypted));
+        }
+
+        document.getElementById('btn-create').addEventListener('click', async () => {
+            const password = document.getElementById('password').value;
+            if (!password || password.length < 8) {
+                alert('Password must be at least 8 characters');
+                return;
+            }
+
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            encryptionKey = await deriveKey(password, salt);
+            localStorage.setItem('vault_salt', JSON.stringify(Array.from(salt)));
+
+            db = new WinnowCollection("encrypted_vault", { dim: 32, index_type: 0 });
+            unlockUI();
+        });
+
+        document.getElementById('btn-unlock').addEventListener('click', async () => {
+            const password = document.getElementById('password').value;
+            const saltData = localStorage.getItem('vault_salt');
+
+            if (!saltData) {
+                alert('No vault found. Create a new one.');
+                return;
+            }
+
+            const salt = new Uint8Array(JSON.parse(saltData));
+            encryptionKey = await deriveKey(password, salt);
+
+            // Try to load existing vault
+            const snapshot = localStorage.getItem('vault_snapshot');
+            if (snapshot) {
+                try {
+                    const encrypted = JSON.parse(snapshot);
+                    const decrypted = await decrypt(encrypted, encryptionKey);
+                    db = WinnowCollection.load_snapshot(new Uint8Array(decrypted), null);
+                    unlockUI();
+                } catch (e) {
+                    alert('Wrong password or corrupted vault');
+                }
+            } else {
+                db = new WinnowCollection("encrypted_vault", { dim: 32, index_type: 0 });
+                unlockUI();
+            }
+        });
+
+        document.getElementById('btn-add').addEventListener('click', async () => {
+            const secret = document.getElementById('secret').value;
+            if (!secret) return;
+
+            // Simple hash to vector (in real app, use embeddings)
+            const vector = new Float32Array(32);
+            for (let i = 0; i < secret.length && i < 32; i++) {
+                vector[i] = secret.charCodeAt(i) / 255;
+            }
+
+            const id = Date.now();
+            await db.add(id, vector, null, null, JSON.stringify({ text: secret, ts: id }));
+
+            // Save encrypted
+            const snapshot = db.snapshot();
+            const encrypted = await encrypt(Array.from(snapshot), encryptionKey);
+            localStorage.setItem('vault_snapshot', JSON.stringify(encrypted));
+
+            document.getElementById('vault-status').innerHTML = '<div class="status success">✅ Secret stored and encrypted</div>';
+            document.getElementById('secret').value = '';
+        });
+
+        document.getElementById('btn-search').addEventListener('click', async () => {
+            const query = document.getElementById('secret').value;
+            const vector = new Float32Array(32);
+            for (let i = 0; i < query.length && i < 32; i++) {
+                vector[i] = query.charCodeAt(i) / 255;
+            }
+
+            const results = await db.search(vector, 5);
+            document.getElementById('vault-status').innerHTML = '<div class="status success">Found ' + results.length + ' results</div>';
+        });
+
+        function unlockUI() {
+            document.getElementById('vault-card').classList.remove('locked');
+            document.getElementById('vault-card').querySelector('.lock-icon').textContent = '🔓';
+            document.getElementById('auth-card').style.display = 'none';
+        }
+    </script>
+</body>
+
+</html>

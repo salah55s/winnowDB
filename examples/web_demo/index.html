@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WinnowDB Interactive Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .demo-section {
+            padding: 30px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .demo-section:last-child {
+            border-bottom: none;
+        }
+
+        .demo-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .dataset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .doc-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+
+        .doc-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .doc-card.selected {
+            border-left-color: #f59e0b;
+            background: #fef3c7;
+        }
+
+        .doc-id {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .doc-title {
+            color: #333;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .doc-category {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-top: 8px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-box button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .search-box button:hover {
+            background: #5568d3;
+        }
+
+        .search-box button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .results-container {
+            margin-top: 20px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border-left: 4px solid #10b981;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .result-rank {
+            background: #10b981;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+
+        .result-content {
+            flex: 1;
+        }
+
+        .result-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .result-score {
+            color: #10b981;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .filter-section {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+
+        .filter-tag {
+            padding: 8px 16px;
+            background: #e0e0e0;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .filter-tag:hover {
+            background: #d0d0d0;
+        }
+
+        .filter-tag.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2rem;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading::after {
+            content: '...';
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 WinnowDB Interactive Demo</h1>
+            <p>Real-time vector search powered by WebAssembly</p>
+        </div>
+
+        <div class="demo-section">
+            <h2>📚 Document Collection</h2>
+            <div id="loading" class="loading">Initializing WinnowDB</div>
+            <div id="dataset" class="dataset-grid" style="display: none;"></div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🔍 Semantic Search</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                Type a query to find semantically similar documents:
+            </p>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="e.g., 'machine learning tutorial' or 'web development'"
+                    disabled />
+                <button id="searchBtn" disabled>Search</button>
+            </div>
+            <div id="results" class="results-container"></div>
+        </div>
+
+        <div class="demo-section">
+            <h2>🎯 Filtered Search</h2>
+            <p style="margin-bottom: 15px; color: #666;">
+                Select a category filter:
+            </p>
+            <div class="filter-section">
+                <div class="filter-tag" data-filter="all">All</div>
+                <div class="filter-tag" data-filter="ml">Machine Learning</div>
+                <div class="filter-tag" data-filter="python">Python</div>
+                <div class="filter-tag" data-filter="rust">Rust</div>
+                <div class="filter-tag" data-filter="other">Other</div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="filteredSearchInput" placeholder="Search within selected category..." disabled />
+                <button id="filteredSearchBtn" disabled>Search with Filter</button>
+            </div>
+            <div id="filteredResults" class="results-container"></div>
+        </div>
+
+        <div class="demo-section">
+            <h2>📊 Performance Metrics</h2>
+            <div id="stats" class="stats-grid"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        // This would import from your built WASM package
+        // import init, { WinnowCollection } from './pkg/winnow_db.js';
+
+        // Mock implementation for demonstration
+        const documents = [
+            { id: 1, title: "Introduction to Machine Learning with Python", category: "ml" },
+            { id: 2, title: "Deep Learning Neural Networks Tutorial", category: "ml" },
+            { id: 3, title: "How to Build a REST API with Rust", category: "rust" },
+            { id: 4, title: "Understanding Vector Databases", category: "other" },
+            { id: 5, title: "Python Data Science Handbook", category: "python" },
+            { id: 6, title: "Rust Programming Language Guide", category: "rust" },
+            { id: 7, title: "Machine Learning Algorithms Explained", category: "ml" },
+            { id: 8, title: "Building Web Applications with React", category: "other" },
+            { id: 9, title: "Advanced Python Programming Techniques", category: "python" },
+            { id: 10, title: "Database Systems and Design Patterns", category: "other" },
+        ];
+
+        let selectedFilter = 'all';
+        let searchCount = 0;
+        let totalLatency = 0;
+
+        // Simple text similarity for demo
+        function textSimilarity(text1, text2) {
+            const words1 = text1.toLowerCase().split(/\s+/);
+            const words2 = text2.toLowerCase().split(/\s+/);
+            const intersection = words1.filter(w => words2.includes(w)).length;
+            const union = new Set([...words1, ...words2]).size;
+            return intersection / union;
+        }
+
+        function search(query, filter = null) {
+            const start = performance.now();
+
+            let results = documents
+                .filter(doc => !filter || filter === 'all' || doc.category === filter)
+                .map(doc => ({
+                    ...doc,
+                    score: textSimilarity(query, doc.title)
+                }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 5);
+
+            const latency = performance.now() - start;
+            searchCount++;
+            totalLatency += latency;
+
+            updateStats();
+            return results;
+        }
+
+        function renderDataset() {
+            const container = document.getElementById('dataset');
+            container.innerHTML = documents.map(doc => `
+                <div class="doc-card" data-id="${doc.id}">
+                    <div class="doc-id">ID: ${doc.id}</div>
+                    <div class="doc-title">${doc.title}</div>
+                    <span class="doc-category">${doc.category}</span>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            container.querySelectorAll('.doc-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const id = parseInt(card.dataset.id);
+                    const doc = documents.find(d => d.id === id);
+                    document.getElementById('searchInput').value = doc.title;
+                    performSearch();
+                });
+            });
+        }
+
+        function renderResults(results, containerId) {
+            const container = document.getElementById(containerId);
+            if (results.length === 0) {
+                container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">No results found</p>';
+                return;
+            }
+
+            container.innerHTML = results.map((result, index) => `
+                <div class="result-item">
+                    <div class="result-rank">${index + 1}</div>
+                    <div class="result-content">
+                        <div class="result-title">${result.title}</div>
+                        <div class="result-score">Similarity: ${(result.score * 100).toFixed(1)}%</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateStats() {
+            const avgLatency = searchCount > 0 ? (totalLatency / searchCount).toFixed(2) : 0;
+            const qps = searchCount > 0 ? (searchCount / (totalLatency / 1000)).toFixed(0) : 0;
+
+            document.getElementById('stats').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${documents.length}</div>
+                    <div class="stat-label">Documents Indexed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${searchCount}</div>
+                    <div class="stat-label">Total Searches</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgLatency}ms</div>
+                    <div class="stat-label">Avg Latency</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${qps}</div>
+                    <div class="stat-label">QPS</div>
+                </div>
+            `;
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (!query.trim()) return;
+
+            const results = search(query);
+            renderResults(results, 'results');
+        }
+
+        function performFilteredSearch() {
+            const query = document.getElementById('filteredSearchInput').value;
+            if (!query.trim()) return;
+
+            const results = search(query, selectedFilter);
+            renderResults(results, 'filteredResults');
+        }
+
+        // Initialize
+        setTimeout(() => {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dataset').style.display = 'grid';
+            document.getElementById('searchInput').disabled = false;
+            document.getElementById('searchBtn').disabled = false;
+            document.getElementById('filteredSearchInput').disabled = false;
+            document.getElementById('filteredSearchBtn').disabled = false;
+
+            renderDataset();
+            updateStats();
+        }, 1000);
+
+        // Event listeners
+        document.getElementById('searchBtn').addEventListener('click', performSearch);
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        document.getElementById('filteredSearchBtn').addEventListener('click', performFilteredSearch);
+        document.getElementById('filteredSearchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performFilteredSearch();
+        });
+
+        // Filter tags
+        document.querySelectorAll('.filter-tag').forEach(tag => {
+            tag.addEventListener('click', () => {
+                document.querySelectorAll('.filter-tag').forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                selectedFilter = tag.dataset.filter;
+            });
+        });
+
+        // Set default active filter
+        document.querySelector('.filter-tag').classList.add('active');
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WinnowDB - Basic Example</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #38bdf8;
+      margin-bottom: 1rem;
+    }
+
+    .status {
+      background: #1e293b;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 0.5rem;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+
+    .results {
+      background: #1e293b;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .result-item {
+      padding: 0.5rem;
+      border-bottom: 1px solid #334155;
+    }
+
+    pre {
+      background: #0f172a;
+      padding: 0.5rem;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🚀 WinnowDB Basic Example</h1>
+
+    <div class="status" id="status">Loading WASM module...</div>
+
+    <div>
+      <button id="btn-add" disabled>Add 1000 Vectors</button>
+      <button id="btn-search" disabled>Search</button>
+      <button id="btn-count" disabled>Count</button>
+    </div>
+
+    <div class="results" id="results">
+      <em>Results will appear here...</em>
+    </div>
+  </div>
+
+  <script type="module">
+    import init, { WinnowCollection } from '../../pkg/winnow_db.js';
+
+    const status = document.getElementById('status');
+    const results = document.getElementById('results');
+    const btnAdd = document.getElementById('btn-add');
+    const btnSearch = document.getElementById('btn-search');
+    const btnCount = document.getElementById('btn-count');
+
+    let db;
+
+    async function initialize() {
+      try {
+        await init();
+
+        const config = {
+          dim: 128,
+          index_type: "HNSW",
+          m: 16,
+          ef_construction: 100,
+          max_elements: 2000
+        };
+
+        db = new WinnowCollection("basic_example", config, null);
+
+        status.textContent = '✅ WinnowDB initialized! Dimension: 128, Index: HNSW';
+        btnAdd.disabled = false;
+        btnSearch.disabled = false;
+        btnCount.disabled = false;
+      } catch (e) {
+        status.textContent = '❌ Error: ' + e;
+      }
+    }
+
+    btnAdd.addEventListener('click', async () => {
+      status.textContent = 'Adding 1000 vectors...';
+      const start = performance.now();
+
+      for (let i = 0; i < 1000; i++) {
+        const vector = new Float32Array(128).map(() => Math.random() - 0.5);
+        const payload = JSON.stringify({ id: i, category: i % 5, name: `Vector ${i}` });
+        await db.add(i, vector, null, null, payload);
+      }
+
+      const elapsed = (performance.now() - start).toFixed(1);
+      status.textContent = `✅ Added 1000 vectors in ${elapsed}ms (${(1000 / elapsed * 1000).toFixed(0)} vec/s)`;
+    });
+
+    btnSearch.addEventListener('click', async () => {
+      status.textContent = 'Searching...';
+      const query = new Float32Array(128).map(() => Math.random() - 0.5);
+
+      const start = performance.now();
+      const searchResults = await db.search(query, 10);
+      const elapsed = (performance.now() - start).toFixed(2);
+
+      status.textContent = `✅ Search completed in ${elapsed}ms`;
+
+      results.innerHTML = '<strong>Top 10 Results:</strong><br>';
+      searchResults.forEach(([id, distance], i) => {
+        results.innerHTML += `<div class="result-item">#${i + 1}: ID=${id}, Distance=${distance.toFixed(4)}</div>`;
+      });
+    });
+
+    btnCount.addEventListener('click', () => {
+      const count = db.count();
+      status.textContent = `📊 Collection contains ${count} vectors`;
+    });
+
+    initialize();
+  </script>
+</body>
+
+</html>
